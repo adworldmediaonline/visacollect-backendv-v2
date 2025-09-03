@@ -218,7 +218,15 @@ export const uploadDocuments = asyncHandler(async (req, res) => {
   }
 
   // Check if main applicant details are completed
-  if (!application.mainApplicant || !application.mainApplicant.documents) {
+  if (!application.mainApplicant) {
+    throw new AppError('Please complete applicant details first', 400);
+  }
+
+  // Check if we're in the correct status for document upload
+  if (
+    application.status !== 'applicant_details_completed' &&
+    application.currentStep < 3
+  ) {
     throw new AppError('Please complete applicant details first', 400);
   }
 
