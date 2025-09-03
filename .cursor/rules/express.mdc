@@ -1,0 +1,124 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+## Environment and Tools
+
+- **Node.js (LTS)** + **Express.js**
+- **Mongoose** for MongoDB
+- **Zod** for input validation
+- **Cloudinary SDK** for image uploads
+- **Nodemailer** for emails (SMTP/Gmail/SES)
+- **Winston or Pino** for logging
+- **Helmet, cors, compression** for security & performance
+
+---
+
+## Code Style and Structure
+
+```
+src/
+ ├── config/       # db, env
+ ├── models/       # mongoose schemas
+ ├── schemas/      # zod validation
+ ├── services/     # business logic
+ ├── controllers/  # req/res handlers
+ ├── routes/       # express routes
+ ├── middleware/   # auth, errors
+ ├── utils/        # helpers (email, cloudinary, etc.)
+ └── app.js        # entry point
+```
+
+- Use **functional programming** (no classes except for error objects).
+- **Async/await everywhere**.
+- Controllers = request/response only.
+- Services = business logic only.
+
+---
+
+## Naming Conventions
+
+- **kebab-case** for folders (e.g., `user-service/`).
+- **PascalCase** for Mongoose models (`User`).
+- **camelCase** for variables and functions (`getUserById`, `isAuthenticated`).
+
+---
+
+## Database (Mongoose + MongoDB)
+
+- Define **strict schemas** with validation.
+- Use `.lean()` for read-only queries.
+- Add **indexes** for common queries.
+- Validate input with **Zod** before DB operations.
+- Use **transactions** (`session`) for multi-step DB writes.
+
+---
+
+## API & Routing
+
+- RESTful endpoints:
+  - `/api/v1/users`
+  - `/api/v1/blogs`
+- Flow:
+  1. Validate request with Zod
+  2. Controller (req/res only)
+  3. Service (business logic / DB ops)
+  4. Return JSON
+
+---
+
+## Error Handling
+
+- Centralized error handler middleware.
+- Custom error class:
+
+```js
+class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+```
+
+- Standard JSON error response:
+
+```json
+{
+  "success": false,
+  "error": "Validation failed",
+  "details": { "field": "email", "issue": "Invalid format" }
+}
+```
+
+---
+
+## Security
+
+- Use `helmet()` for secure headers.
+- Enable `cors` with strict origins.
+- Sanitize inputs (prevent NoSQL injection).
+- Add **rate limiting** (`express-rate-limit`).
+- Keep secrets in `.env` (never in code).
+
+---
+
+## Performance
+
+- Use **MongoDB indexes** for performance.
+- Implement **pagination** (`limit`, `skip`) for large datasets.
+- Enable `compression` for faster responses.
+- Offload heavy tasks (emails, image processing) to background jobs if needed.
+
+---
+
+## Logging & Monitoring
+
+- Use **Winston or Pino** for structured JSON logs.
+- Add `requestId` to logs for traceability.
+- Health check endpoint: `/health`.
+- Use simple monitoring tools (logs + health checks).
+
+---
