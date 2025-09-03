@@ -55,12 +55,21 @@ const generateUniqueFilename = (originalName, folder = '') => {
   return `${sanitizedBaseName}_${timestamp}_${randomId}.${extension}`;
 };
 
+// Convert buffer to data URI for Cloudinary
+const bufferToDataURI = (buffer, mimetype) => {
+  const base64 = buffer.toString('base64');
+  return `data:${mimetype};base64,${base64}`;
+};
+
 // Upload single file to Cloudinary
 const uploadToCloudinary = async (file, folder = '') => {
   try {
     const publicId = generateUniqueFilename(file.originalname, folder);
 
-    const result = await cloudinary.uploader.upload(file.buffer, {
+    // Convert buffer to data URI for Cloudinary
+    const dataURI = bufferToDataURI(file.buffer, file.mimetype);
+
+    const result = await cloudinary.uploader.upload(dataURI, {
       public_id: publicId,
       resource_type: 'auto',
       folder: folder ? folder.split('/')[0] : undefined,
