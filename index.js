@@ -12,6 +12,7 @@ dotenv.config();
 import { secret } from './config/env.js';
 
 // Import routes
+import documentRoutes from './routes/document.js';
 import healthRoutes from './routes/health.js';
 import turkeyVisaRoutes from './routes/turkeyVisa.js';
 
@@ -55,6 +56,9 @@ app.get('/', (req, res) => {
     message: 'API is running',
   });
 });
+
+// Document upload routes (global)
+app.use('/api/v1', documentRoutes);
 
 // Turkey Visa API routes
 app.use('/api/v1/turkey', turkeyVisaRoutes);

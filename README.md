@@ -7,7 +7,8 @@ A scalable and modular backend system for processing visa applications across mu
 - **Multi-Country Architecture**: Modular design for easy addition of new countries
 - **Step-based Application Process**: Standardized 4-step visa application workflow
 - **Multi-Applicant Support**: Main applicant + additional applicants under one application
-- **Document Management**: File upload support with Cloudinary integration
+- **Global Document Upload Service**: Centralized file upload with Cloudinary integration
+- **Two-Tier Upload Architecture**: Separate file upload from document registration
 - **Email Notifications**: Automated email confirmations and updates
 - **Comprehensive Validation**: Zod-based input validation with detailed error messages
 - **Structured Logging**: Winston-based logging with different levels
@@ -140,16 +141,24 @@ The server will start on `http://localhost:3000`
 ### Base URLs
 
 - **Health Check**: `/health`
+- **Global Document Service**: `/api/v1/document/*`
 - **Turkey APIs**: `/api/v1/turkey/*`
 - **Future Countries**: `/api/v1/{country}/*`
 
-### Common Endpoints (per country)
+### Global Document Upload Endpoints
+
+- `POST /api/v1/single/document` - Upload single document
+- `POST /api/v1/multiple/document` - Upload multiple documents
+- `GET /api/v1/document/:publicId` - Get document info
+- `DELETE /api/v1/document/:publicId` - Delete document
+
+### Country-Specific Endpoints (per country)
 
 - `GET /{country}/visa-fee` - Get visa fees
 - `GET /{country}/countries` - Get supported countries
 - `POST /{country}/start` - Start application
 - `POST /{country}/applicant-details` - Save applicant details
-- `POST /{country}/documents` - Upload documents
+- `POST /{country}/documents` - Register documents with application
 - `POST /{country}/add-applicant` - Add additional applicants
 - `POST /{country}/submit` - Submit application
 - `GET /{country}/application/:id` - Get application details
@@ -201,6 +210,31 @@ Country-specific fee models containing:
 - **Environment Variables**: Sensitive data not in code
 - **Input Sanitization**: Prevent NoSQL injection
 - **File Security**: Cloudinary secure uploads
+
+## 📁 Document Upload Architecture
+
+The system implements a two-tier document upload architecture for better scalability and efficiency:
+
+### Tier 1: Global Document Upload Service
+
+- **Endpoints**: `/api/v1/single/document`, `/api/v1/multiple/document`
+- **Purpose**: Handle actual file uploads to Cloudinary
+- **Returns**: Structured metadata (URL, publicId, size, format, etc.)
+- **Features**: File validation, Cloudinary integration, folder organization
+
+### Tier 2: Country-Specific Document Registration
+
+- **Endpoints**: `/{country}/documents`
+- **Purpose**: Register uploaded documents with visa applications
+- **Accepts**: Metadata from Tier 1 + supporting document details
+- **Features**: Application-specific validation, document categorization
+
+### Benefits
+
+- **Separation of Concerns**: File handling separate from business logic
+- **Reusability**: Global service works across all countries
+- **Efficiency**: Reduced payload sizes, better error handling
+- **Scalability**: Easy to extend without modifying country-specific code
 
 ## 📧 Notification System
 
