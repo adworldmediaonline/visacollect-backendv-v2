@@ -29,4 +29,10 @@ export const secret = {
   // Application Configuration
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB default
+
+  // PayPal Configuration
+  paypalMode: process.env.PAYPAL_MODE || 'sandbox',
+  paypalClientId: process.env.PAYPAL_CLIENT_ID,
+  paypalClientSecret: process.env.PAYPAL_CLIENT_SECRET,
+  paypalWebhookId: process.env.PAYPAL_WEBHOOK_ID,
 };

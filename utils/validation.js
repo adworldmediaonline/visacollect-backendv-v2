@@ -175,26 +175,45 @@ export const supportingDocumentSchema = z
   );
 
 // Step 3: Document Upload Validation
-export const documentUploadSchema = z.object({
-  supportingDocuments: z
-    .array(supportingDocumentSchema)
-    .min(1, 'At least one supporting document is required')
-    .max(5, 'Maximum 5 supporting documents allowed'),
+export const documentUploadSchema = z
+  .object({
+    supportingDocuments: z
+      .array(supportingDocumentSchema)
+      .max(5, 'Maximum 5 supporting documents allowed')
+      .optional()
+      .default([]),
 
-  additionalDocuments: z
-    .array(
-      z.object({
-        name: z
-          .string()
-          .min(1, 'Document name is required')
-          .max(100, 'Document name is too long'),
-        url: z.string().url('Invalid document URL'),
-        publicId: z.string().optional(),
-      })
-    )
-    .max(10, 'Maximum 10 additional documents allowed')
-    .optional(),
-});
+    additionalDocuments: z
+      .array(
+        z.object({
+          name: z
+            .string()
+            .min(1, 'Document name is required')
+            .max(100, 'Document name is too long'),
+          url: z.string().url('Invalid document URL'),
+          publicId: z.string().optional(),
+          uploadedAt: z.string().optional(),
+        })
+      )
+      .max(10, 'Maximum 10 additional documents allowed')
+      .optional()
+      .default([]),
+  })
+  .refine(
+    (data) => {
+      // At least one type of document must be provided
+      const hasSupportingDocs =
+        data.supportingDocuments && data.supportingDocuments.length > 0;
+      const hasAdditionalDocs =
+        data.additionalDocuments && data.additionalDocuments.length > 0;
+
+      return hasSupportingDocs || hasAdditionalDocs;
+    },
+    {
+      message: 'At least one document (supporting or additional) is required',
+      path: ['supportingDocuments'],
+    }
+  );
 
 // Complete Applicant Validation (combines details + documents)
 export const completeApplicantSchema = applicantDetailsSchema.merge(
@@ -224,6 +243,53 @@ export const getApplicationSchema = z.object({
     .regex(/^TUR-[A-Z0-9]{8}$/, 'Invalid application ID format'),
 
   email: z.string().regex(emailRegex, 'Invalid email format').toLowerCase(),
+});
+
+// Payment validation schemas
+export const createPaymentSchema = z.object({
+  applicationId: z
+    .string()
+    .min(1, 'Application ID is required')
+    .regex(/^TUR-[A-Z0-9]{8}$/, 'Invalid application ID format'),
+
+  amount: z
+    .number()
+    .positive('Amount must be greater than 0')
+    .max(10000, 'Amount cannot exceed $10,000'),
+
+  currency: z
+    .string()
+    .length(3, 'Currency must be 3 characters')
+    .regex(/^[A-Z]{3}$/, 'Currency must be uppercase letters')
+    .default('USD'),
+
+  description: z
+    .string()
+    .max(127, 'Description cannot exceed 127 characters')
+    .optional(),
+});
+
+export const capturePaymentSchema = z.object({
+  orderId: z
+    .string()
+    .min(1, 'Order ID is required')
+    .regex(/^[\w-]+$/, 'Invalid order ID format'),
+
+  applicationId: z
+    .string()
+    .min(1, 'Application ID is required')
+    .regex(/^TUR-[A-Z0-9]{8}$/, 'Invalid application ID format'),
+});
+
+export const refundPaymentSchema = z.object({
+  paymentId: z.string().min(1, 'Payment ID is required'),
+
+  amount: z
+    .number()
+    .positive('Refund amount must be greater than 0')
+    .optional(), // If not provided, full refund
+
+  reason: z.string().max(255, 'Reason cannot exceed 255 characters').optional(),
 });
 
 // Validation helper function

@@ -13,7 +13,9 @@
     "format:check": "prettier --check .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "seed": "node scripts/seedTurkeyVisaFees.js --run",
-    "seed:dev": "NODE_ENV=development npm run seed"
+    "seed:dev": "NODE_ENV=development npm run seed",
+    "test:payments": "node scripts/testPayments.js",
+    "test:payments:watch": "nodemon --exec \"node scripts/testPayments.js\" --ignore node_modules/"
   },
   "keywords": [],
   "author": "",
@@ -31,7 +33,9 @@
     "mongoose": "^8.18.0",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.6",
+    "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "zod": "^4.1.5"
   },
