@@ -9,6 +9,7 @@ A scalable and modular backend system for processing visa applications across mu
 - **Multi-Applicant Support**: Main applicant + additional applicants under one application
 - **Global Document Upload Service**: Centralized file upload with Cloudinary integration
 - **Two-Tier Upload Architecture**: Separate file upload from document registration
+- **PayPal Payment Integration**: Secure one-time payments with webhook support
 - **Email Notifications**: Automated email confirmations and updates
 - **Comprehensive Validation**: Zod-based input validation with detailed error messages
 - **Structured Logging**: Winston-based logging with different levels
@@ -83,16 +84,18 @@ cd visa-collection-backend
 
 2. **Install dependencies**
 
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
 3. **Environment Configuration**
    Copy the environment template and configure your settings:
 
-```bash
-cp env.example .env
-```
+   ```bash
+   cp env.example .env
+   ```
+
+````
 
 Configure the following environment variables:
 
@@ -116,10 +119,16 @@ CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
 
+# PayPal (for payment processing)
+PAYPAL_MODE=sandbox
+PAYPAL_CLIENT_ID=your_paypal_client_id
+PAYPAL_CLIENT_SECRET=your_paypal_client_secret
+PAYPAL_WEBHOOK_ID=your_paypal_webhook_id
+
 # Application
 FRONTEND_URL=http://localhost:3000
 MAX_FILE_SIZE=5242880
-```
+````
 
 4. **Seed Database**
    Populate visa fee data for supported countries:
@@ -142,6 +151,7 @@ The server will start on `http://localhost:3000`
 
 - **Health Check**: `/health`
 - **Global Document Service**: `/api/v1/document/*`
+- **Payment APIs**: `/api/v1/payment/*`
 - **Turkey APIs**: `/api/v1/turkey/*`
 - **Future Countries**: `/api/v1/{country}/*`
 
@@ -151,6 +161,15 @@ The server will start on `http://localhost:3000`
 - `POST /api/v1/multiple/document` - Upload multiple documents
 - `GET /api/v1/document/:publicId` - Get document info
 - `DELETE /api/v1/document/:publicId` - Delete document
+
+### PayPal Payment Endpoints
+
+- `POST /api/v1/payment/paypal/create` - Create PayPal order
+- `POST /api/v1/payment/paypal/capture` - Capture PayPal payment
+- `POST /api/v1/payment/paypal/webhook` - Handle PayPal webhooks
+- `GET /api/v1/payment/:paymentId` - Get payment status
+- `POST /api/v1/payment/refund` - Process payment refund
+- `GET /api/v1/payment/stats/payment` - Get payment statistics
 
 ### Country-Specific Endpoints (per country)
 
@@ -235,6 +254,59 @@ The system implements a two-tier document upload architecture for better scalabi
 - **Reusability**: Global service works across all countries
 - **Efficiency**: Reduced payload sizes, better error handling
 - **Scalability**: Easy to extend without modifying country-specific code
+
+## 💳 PayPal Payment Integration
+
+The system includes comprehensive PayPal REST API integration for secure one-time payments, supporting both web and mobile platforms.
+
+### Key Features
+
+- **Order Creation**: Create PayPal orders with custom amounts and currencies
+- **Payment Capture**: Secure server-side payment capture
+- **Webhook Support**: Real-time payment status updates via PayPal webhooks
+- **Multi-Platform**: Unified API for web (Next.js) and mobile (React Native Expo)
+- **Error Handling**: Comprehensive error handling with retry mechanisms
+- **Environment Support**: Sandbox and production environment configuration
+
+### Payment Flow
+
+1. **Create Order**: Frontend calls `/api/v1/payment/paypal/create` with application details
+2. **PayPal Redirect**: User is redirected to PayPal for payment approval
+3. **Payment Approval**: User approves payment on PayPal
+4. **Return to App**: User returns to frontend with approval token
+5. **Capture Payment**: Frontend calls `/api/v1/payment/paypal/capture` to complete payment
+6. **Webhook Confirmation**: PayPal sends webhook for payment confirmation
+
+### Security Features
+
+- **Server-to-Server**: No client-side handling of PayPal secrets
+- **Webhook Verification**: Signature verification for webhook authenticity
+- **Idempotent Operations**: Duplicate prevention for order creation and capture
+- **Input Validation**: Comprehensive validation using Zod schemas
+- **Environment Separation**: Separate sandbox/production credentials
+
+### Payment Status Tracking
+
+- **CREATED**: PayPal order created, waiting for approval
+- **APPROVED**: User approved payment on PayPal
+- **COMPLETED**: Payment successfully captured
+- **FAILED**: Payment failed or was denied
+- **REFUNDED**: Payment was refunded
+- **CANCELLED**: Payment was cancelled
+
+### Database Schema
+
+The Payment model includes:
+
+- **paymentId**: Unique payment identifier
+- **applicationId**: Linked visa application
+- **orderId**: PayPal order ID
+- **transactionId**: PayPal transaction ID
+- **status**: Payment status
+- **amount & currency**: Payment details
+- **payerEmail & payerName**: Customer information
+- **webhookEvents**: Webhook event history
+- **paypalResponse**: Full PayPal API responses
 
 ## 📧 Notification System
 
@@ -365,11 +437,11 @@ app.use('/api/v1/{country}', {country}Routes);
 
 ### Core Features
 
-- **Payment Integration**: Stripe/PayPal for fee collection
 - **Admin Dashboard**: Application management interface
 - **Document AI**: Automated document verification
 - **Real-time Updates**: WebSocket status notifications
 - **SMS Integration**: Additional notification channels
+- **Multi-Payment Providers**: Add Stripe, Razorpay, etc.
 
 ### Scalability
 

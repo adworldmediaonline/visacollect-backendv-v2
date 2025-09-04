@@ -245,6 +245,53 @@ export const getApplicationSchema = z.object({
   email: z.string().regex(emailRegex, 'Invalid email format').toLowerCase(),
 });
 
+// Payment validation schemas
+export const createPaymentSchema = z.object({
+  applicationId: z
+    .string()
+    .min(1, 'Application ID is required')
+    .regex(/^TUR-[A-Z0-9]{8}$/, 'Invalid application ID format'),
+
+  amount: z
+    .number()
+    .positive('Amount must be greater than 0')
+    .max(10000, 'Amount cannot exceed $10,000'),
+
+  currency: z
+    .string()
+    .length(3, 'Currency must be 3 characters')
+    .regex(/^[A-Z]{3}$/, 'Currency must be uppercase letters')
+    .default('USD'),
+
+  description: z
+    .string()
+    .max(127, 'Description cannot exceed 127 characters')
+    .optional(),
+});
+
+export const capturePaymentSchema = z.object({
+  orderId: z
+    .string()
+    .min(1, 'Order ID is required')
+    .regex(/^[\w-]+$/, 'Invalid order ID format'),
+
+  applicationId: z
+    .string()
+    .min(1, 'Application ID is required')
+    .regex(/^TUR-[A-Z0-9]{8}$/, 'Invalid application ID format'),
+});
+
+export const refundPaymentSchema = z.object({
+  paymentId: z.string().min(1, 'Payment ID is required'),
+
+  amount: z
+    .number()
+    .positive('Refund amount must be greater than 0')
+    .optional(), // If not provided, full refund
+
+  reason: z.string().max(255, 'Reason cannot exceed 255 characters').optional(),
+});
+
 // Validation helper function
 export const validateData = (schema, data) => {
   try {

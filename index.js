@@ -14,6 +14,7 @@ import { secret } from './config/env.js';
 // Import routes
 import documentRoutes from './routes/document.js';
 import healthRoutes from './routes/health.js';
+import paymentRoutes from './routes/payment.js';
 import turkeyVisaRoutes from './routes/turkeyVisa.js';
 
 // Import middleware
@@ -59,6 +60,9 @@ app.get('/', (req, res) => {
 
 // Document upload routes (global)
 app.use('/api/v1', documentRoutes);
+
+// Payment routes (global)
+app.use('/api/v1/payment', paymentRoutes);
 
 // Turkey Visa API routes
 app.use('/api/v1/turkey', turkeyVisaRoutes);

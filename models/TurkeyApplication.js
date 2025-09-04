@@ -172,6 +172,7 @@ const turkeyApplicationSchema = new mongoose.Schema(
         'applicant_details_completed',
         'documents_completed',
         'submitted',
+        'paid',
         'processing',
         'approved',
         'rejected',

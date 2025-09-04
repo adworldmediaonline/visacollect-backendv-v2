@@ -468,6 +468,350 @@ Get application details by ID.
 - Standard email format validation
 - Unique application per email (draft applications only)
 
+## 💳 PayPal Payment Integration
+
+The Turkey visa system includes integrated PayPal payment processing for secure online payments. This section covers the complete payment flow and API usage.
+
+### Payment Flow Overview
+
+1. **Application Ready**: User completes all application steps (applicant details, documents)
+2. **Create Order**: Backend creates PayPal order with total amount
+3. **PayPal Redirect**: User redirected to PayPal for payment
+4. **Payment Approval**: User approves payment on PayPal
+5. **Return to Application**: User redirected back to application
+6. **Capture Payment**: Backend captures the approved payment
+7. **Application Paid**: Application status updated to 'paid'
+
+### PayPal Payment Endpoints
+
+#### POST `/api/v1/payment/paypal/create`
+
+Creates a new PayPal order for visa application payment.
+
+**Request Body:**
+
+```json
+{
+  "applicationId": "TUR-AD2U4MJ5",
+  "amount": 84,
+  "currency": "USD",
+  "description": "Turkey Visa Application Payment"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "PayPal order created successfully",
+  "data": {
+    "paymentId": "PAY-A1B2C3D4E",
+    "orderId": "5O190127TN364715T",
+    "approvalUrl": "https://www.sandbox.paypal.com/checkoutnow?token=5O190127TN364715T",
+    "status": "CREATED",
+    "amount": 84,
+    "currency": "USD"
+  }
+}
+```
+
+**Error Response:**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PAYMENT_ERROR",
+    "message": "Application not found"
+  }
+}
+```
+
+#### POST `/api/v1/payment/paypal/capture`
+
+Captures an approved PayPal payment order.
+
+**Request Body:**
+
+```json
+{
+  "orderId": "5O190127TN364715T",
+  "applicationId": "TUR-AD2U4MJ5"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Payment captured successfully",
+  "data": {
+    "paymentId": "PAY-A1B2C3D4E",
+    "orderId": "5O190127TN364715T",
+    "transactionId": "8AC96375WN7079234",
+    "status": "COMPLETED",
+    "amount": 84,
+    "currency": "USD",
+    "payerEmail": "buyer@example.com",
+    "capturedAt": "2025-09-04T10:30:00.000Z"
+  }
+}
+```
+
+#### GET `/api/v1/payment/:paymentId`
+
+Retrieves payment status and details.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentId": "PAY-A1B2C3D4E",
+    "applicationId": "TUR-AD2U4MJ5",
+    "orderId": "5O190127TN364715T",
+    "transactionId": "8AC96375WN7079234",
+    "status": "COMPLETED",
+    "amount": 84,
+    "currency": "USD",
+    "payerEmail": "buyer@example.com",
+    "paypalStatus": "APPROVED",
+    "createdAt": "2025-09-04T10:25:00.000Z",
+    "updatedAt": "2025-09-04T10:30:00.000Z"
+  }
+}
+```
+
+#### POST `/api/v1/payment/paypal/webhook`
+
+Handles PayPal webhook events for payment confirmations. This endpoint is called automatically by PayPal.
+
+**Headers:**
+
+```
+paypal-transmission-id: 69cd13f0-d67e-11e5-baa3-778b53f4ae55
+paypal-transmission-time: 2016-06-02T22:33:33Z
+paypal-transmission-sig: 6Gq3NpZfzHXr7vEo6CD6gHKFBH4R...
+paypal-cert-url: https://api.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-a5cafa
+paypal-auth-algo: SHA256withRSA
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Webhook processed successfully"
+}
+```
+
+#### POST `/api/v1/payment/refund`
+
+Processes a refund for a completed payment.
+
+**Request Body:**
+
+```json
+{
+  "paymentId": "PAY-A1B2C3D4E",
+  "amount": 84,
+  "reason": "Customer requested refund"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Payment refunded successfully",
+  "data": {
+    "paymentId": "PAY-A1B2C3D4E",
+    "refundAmount": 84,
+    "refundId": "8AC96375WN7079245",
+    "refundedAt": "2025-09-04T11:00:00.000Z"
+  }
+}
+```
+
+### Payment Status Values
+
+- **CREATED**: PayPal order created, waiting for user approval
+- **APPROVED**: User approved payment on PayPal
+- **COMPLETED**: Payment successfully captured
+- **FAILED**: Payment failed or was denied
+- **REFUNDED**: Payment was refunded
+- **CANCELLED**: Payment was cancelled
+
+### Frontend Integration Examples
+
+#### Web (Next.js/React)
+
+```javascript
+// 1. Create PayPal order
+const createOrder = async (applicationId, amount) => {
+  const response = await fetch('/api/v1/payment/paypal/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      applicationId,
+      amount: 84,
+      currency: 'USD',
+    }),
+  });
+
+  const data = await response.json();
+
+  if (data.success) {
+    // Redirect to PayPal
+    window.location.href = data.data.approvalUrl;
+  }
+};
+
+// 2. Capture payment (after PayPal redirect)
+const capturePayment = async (orderId, applicationId) => {
+  const response = await fetch('/api/v1/payment/paypal/capture', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      orderId,
+      applicationId,
+    }),
+  });
+
+  const data = await response.json();
+  return data;
+};
+```
+
+#### Mobile (React Native Expo)
+
+```javascript
+// Using WebView for PayPal approval
+const handlePayment = async () => {
+  const createResponse = await fetch('/api/v1/payment/paypal/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      applicationId: 'TUR-AD2U4MJ5',
+      amount: 84,
+      currency: 'USD',
+    }),
+  });
+
+  const createData = await createResponse.json();
+
+  if (createData.success) {
+    // Open PayPal in WebView
+    setShowWebView(true);
+    setPaypalUrl(createData.data.approvalUrl);
+    setOrderId(createData.data.orderId);
+  }
+};
+
+// Handle PayPal redirect back to app
+const handleNavigationStateChange = (navState) => {
+  const { url } = navState;
+
+  if (url.includes('success')) {
+    // Capture payment
+    capturePayment(orderId, applicationId);
+    setShowWebView(false);
+  } else if (url.includes('cancel')) {
+    setShowWebView(false);
+  }
+};
+```
+
+### PayPal Configuration
+
+#### Environment Variables
+
+```env
+# PayPal Configuration
+PAYPAL_MODE=sandbox                    # 'sandbox' or 'production'
+PAYPAL_CLIENT_ID=your_paypal_client_id
+PAYPAL_CLIENT_SECRET=your_paypal_client_secret
+PAYPAL_WEBHOOK_ID=your_paypal_webhook_id
+```
+
+#### Webhook Setup
+
+1. **Sandbox**: Configure webhook URL in PayPal Developer Dashboard
+2. **Production**: Configure webhook URL in PayPal Business Account
+3. **Webhook URL**: `https://yourdomain.com/api/v1/payment/paypal/webhook`
+4. **Events to Subscribe**:
+   - `PAYMENT.CAPTURE.COMPLETED`
+   - `PAYMENT.CAPTURE.DENIED`
+   - `PAYMENT.CAPTURE.REFUNDED`
+
+### Error Handling
+
+#### Common Error Scenarios
+
+**Application Not Ready:**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PAYMENT_ERROR",
+    "message": "Application is not ready for payment"
+  }
+}
+```
+
+**Payment Already Exists:**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PAYMENT_ERROR",
+    "message": "Payment already exists for this application"
+  }
+}
+```
+
+**PayPal API Error:**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PAYPAL_ERROR",
+    "message": "Failed to create PayPal order"
+  }
+}
+```
+
+### Testing PayPal Integration
+
+#### Sandbox Testing
+
+1. **Set Environment**: `PAYPAL_MODE=sandbox`
+2. **Test Accounts**: Use PayPal Developer sandbox accounts
+3. **Test Cards**: Use sandbox test payment methods
+4. **Webhook Testing**: Use ngrok for local webhook testing
+
+#### Production Setup
+
+1. **Set Environment**: `PAYPAL_MODE=production`
+2. **Live Credentials**: Use production PayPal credentials
+3. **SSL Required**: HTTPS required for production webhooks
+4. **Domain Verification**: Verify domain ownership for webhooks
+
+### Payment Security Features
+
+- **Server-to-Server**: All PayPal API calls happen server-side
+- **Webhook Verification**: Signature verification for webhook authenticity
+- **Idempotent Operations**: Prevents duplicate orders and captures
+- **Input Validation**: Comprehensive validation using Zod schemas
+- **Error Logging**: All payment errors are logged for debugging
+
 ## 📧 Email Notifications
 
 The system sends automated emails for:
