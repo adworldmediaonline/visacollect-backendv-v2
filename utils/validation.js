@@ -133,24 +133,7 @@ export const applicantDetailsSchema = z.object({
 export const supportingDocumentSchema = z
   .object({
     documentType: z.enum(
-      [
-        'Visa',
-        'Residence Permit',
-        'Passport',
-        'Photo',
-        'Birth Certificate',
-        'Marriage Certificate',
-        'Bank Statement',
-        'Employment Letter',
-        'visa',
-        'residence permit',
-        'passport',
-        'photo',
-        'birth-certificate',
-        'marriage-certificate',
-        'bank-statement',
-        'employment-letter',
-      ],
+      ['Visa', 'Residence Permit', 'visa', 'residence-permit'],
       {
         errorMap: () => ({
           message: 'Invalid document type selected',
