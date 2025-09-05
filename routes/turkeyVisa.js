@@ -7,6 +7,7 @@ import {
   saveApplicantDetails,
   startApplication,
   submitApplication,
+  updateApplicantDetails,
   updateApplication,
   uploadDocuments,
 } from '../controllers/turkeyVisaController.js';
@@ -21,6 +22,7 @@ router.get('/countries', getSupportedCountriesList);
 router.post('/start', startApplication);
 router.put('/application/:applicationId', updateApplication);
 router.post('/applicant-details', saveApplicantDetails);
+router.put('/applicant-details/:applicationId', updateApplicantDetails);
 router.post('/documents', uploadDocuments);
 router.post('/add-applicant', addApplicant);
 router.post('/submit', submitApplication);

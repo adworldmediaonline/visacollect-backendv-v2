@@ -246,6 +246,56 @@ export const uploadDocuments = asyncHandler(async (req, res) => {
   });
 });
 
+export const updateDocuments = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { documents } = req.body;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if application has main applicant
+  if (!application.mainApplicant) {
+    throw new AppError('Please complete applicant details first', 400);
+  }
+
+  // Check if application has existing documents to update
+  if (!application.mainApplicant.documents) {
+    throw new AppError('No documents found to update', 400);
+  }
+
+  // Validate document data
+  const validation = validateData(documentUploadSchema, documents);
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  // Update main applicant documents
+  application.mainApplicant.documents = validation.data;
+
+  application.updatedAt = new Date();
+
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Documents updated successfully',
+    data: {
+      applicationId,
+      status: application.status,
+      currentStep: application.currentStep,
+      documents: application.mainApplicant.documents,
+      updatedAt: application.updatedAt,
+    },
+  });
+});
+
 // @desc    Add additional applicant (Step 4)
 // @route   POST /api/v1/turkey/add-applicant
 // @access  Public
@@ -443,6 +493,56 @@ export const updateApplication = asyncHandler(async (req, res) => {
       email: existingApplication.email,
       status: existingApplication.status,
       updatedAt: existingApplication.updatedAt,
+    },
+  });
+});
+
+export const updateApplicantDetails = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { applicantDetails } = req.body;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if application has applicant details to update
+  if (!application.mainApplicant) {
+    throw new AppError('No applicant details found to update', 400);
+  }
+
+  // Validate applicant details
+  const validation = validateData(applicantDetailsSchema, applicantDetails);
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  // Update application with main applicant details
+  application.mainApplicant = {
+    ...validation.data,
+    dateOfBirth: new Date(validation.data.dateOfBirth),
+    passportIssueDate: new Date(validation.data.passportIssueDate),
+    passportExpiryDate: new Date(validation.data.passportExpiryDate),
+  };
+
+  application.updatedAt = new Date();
+
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Applicant details updated successfully',
+    data: {
+      applicationId,
+      status: application.status,
+      currentStep: application.currentStep,
+      mainApplicant: application.mainApplicant,
+      updatedAt: application.updatedAt,
     },
   });
 });
