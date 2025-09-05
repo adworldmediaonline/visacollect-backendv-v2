@@ -60,18 +60,7 @@ export const startApplication = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check if user already has a draft application
-  const existingDraft = await TurkeyApplication.findOne({
-    email,
-    status: { $in: ['draft', 'started'] },
-  });
-
-  if (existingDraft) {
-    throw new AppError(
-      `You already have a draft application (${existingDraft.applicationId}). Please complete it first.`,
-      400
-    );
-  }
+  // Allow multiple applications with same email - no restriction
 
   // Generate unique application ID
   let applicationId;
@@ -407,6 +396,57 @@ export const submitApplication = asyncHandler(async (req, res) => {
 // @desc    Get supported countries
 // @route   GET /api/v1/turkey/countries
 // @access  Public
+export const updateApplication = asyncHandler(async (req, res) => {
+  // Validate input data
+  const validation = validateData(startApplicationSchema, req.body);
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  const { passportCountry, visaType, destination, email } = validation.data;
+  const { applicationId } = req.params;
+
+  // Check if application exists
+  const existingApplication = await TurkeyApplication.findOne({
+    applicationId,
+  });
+  if (!existingApplication) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if country is supported
+  const supportedCountries = getSupportedCountries();
+  if (!supportedCountries.includes(passportCountry)) {
+    throw new AppError(
+      `Visa service not available for ${passportCountry}`,
+      400
+    );
+  }
+
+  // Update application
+  existingApplication.passportCountry = passportCountry;
+  existingApplication.visaType = visaType;
+  existingApplication.destination = destination;
+  existingApplication.email = email;
+  existingApplication.updatedAt = new Date();
+
+  await existingApplication.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Application updated successfully',
+    data: {
+      applicationId: existingApplication.applicationId,
+      passportCountry: existingApplication.passportCountry,
+      visaType: existingApplication.visaType,
+      destination: existingApplication.destination,
+      email: existingApplication.email,
+      status: existingApplication.status,
+      updatedAt: existingApplication.updatedAt,
+    },
+  });
+});
+
 export const getSupportedCountriesList = asyncHandler(async (req, res) => {
   const countries = getSupportedCountries();
 
