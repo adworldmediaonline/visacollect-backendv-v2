@@ -556,3 +556,116 @@ export const getSupportedCountriesList = asyncHandler(async (req, res) => {
     count: countries.length,
   });
 });
+
+// @desc    Update a specific additional applicant
+// @route   PUT /api/v1/turkey/add-applicant/:applicationId/:index
+// @access  Public
+export const updateApplicant = asyncHandler(async (req, res) => {
+  const { applicationId, index } = req.params;
+  const { applicant } = req.body;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  if (index === undefined || index === null) {
+    throw new AppError('Applicant index is required', 400);
+  }
+
+  const applicantIndex = parseInt(index);
+  if (isNaN(applicantIndex) || applicantIndex < 0) {
+    throw new AppError('Invalid applicant index', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if index exists
+  if (
+    !application.additionalApplicants ||
+    applicantIndex >= application.additionalApplicants.length
+  ) {
+    throw new AppError('Applicant not found at specified index', 404);
+  }
+
+  // Validate applicant data
+  const validation = validateData(addApplicantSchema, { applicant });
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  // Update the applicant at the specified index
+  const updatedApplicant = {
+    ...validation.data.applicant,
+    dateOfBirth: new Date(validation.data.applicant.dateOfBirth),
+    passportIssueDate: new Date(validation.data.applicant.passportIssueDate),
+    passportExpiryDate: new Date(validation.data.applicant.passportExpiryDate),
+  };
+
+  application.additionalApplicants[applicantIndex] = updatedApplicant;
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Additional applicant updated successfully',
+    data: {
+      applicationId,
+      updatedApplicant: application.additionalApplicants[applicantIndex],
+      index: applicantIndex,
+    },
+  });
+});
+
+// @desc    Delete a specific additional applicant
+// @route   DELETE /api/v1/turkey/add-applicant/:applicationId/:index
+// @access  Public
+export const deleteApplicant = asyncHandler(async (req, res) => {
+  const { applicationId, index } = req.params;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  if (index === undefined || index === null) {
+    throw new AppError('Applicant index is required', 400);
+  }
+
+  const applicantIndex = parseInt(index);
+  if (isNaN(applicantIndex) || applicantIndex < 0) {
+    throw new AppError('Invalid applicant index', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if index exists
+  if (
+    !application.additionalApplicants ||
+    applicantIndex >= application.additionalApplicants.length
+  ) {
+    throw new AppError('Applicant not found at specified index', 404);
+  }
+
+  // Remove the applicant at the specified index
+  const deletedApplicant = application.additionalApplicants.splice(
+    applicantIndex,
+    1
+  )[0];
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Additional applicant deleted successfully',
+    data: {
+      applicationId,
+      deletedApplicant,
+      index: applicantIndex,
+    },
+  });
+});

@@ -1,12 +1,14 @@
 import express from 'express';
 import {
   addApplicant,
+  deleteApplicant,
   getApplication,
   getSupportedCountriesList,
   getVisaFees,
   saveApplicantDetails,
   startApplication,
   submitApplication,
+  updateApplicant,
   updateApplicantDetails,
   updateApplication,
   updateDocuments,
@@ -27,6 +29,8 @@ router.put('/applicant-details/:applicationId', updateApplicantDetails);
 router.post('/documents', uploadDocuments);
 router.put('/documents/:applicationId', updateDocuments);
 router.post('/add-applicant', addApplicant);
+router.put('/add-applicant/:applicationId/:index', updateApplicant);
+router.delete('/add-applicant/:applicationId/:index', deleteApplicant);
 router.post('/submit', submitApplication);
 
 // Get application by ID
