@@ -9,6 +9,7 @@ import {
   submitApplication,
   updateApplicantDetails,
   updateApplication,
+  updateDocuments,
   uploadDocuments,
 } from '../controllers/turkeyVisaController.js';
 
@@ -24,6 +25,7 @@ router.put('/application/:applicationId', updateApplication);
 router.post('/applicant-details', saveApplicantDetails);
 router.put('/applicant-details/:applicationId', updateApplicantDetails);
 router.post('/documents', uploadDocuments);
+router.put('/documents/:applicationId', updateDocuments);
 router.post('/add-applicant', addApplicant);
 router.post('/submit', submitApplication);
 

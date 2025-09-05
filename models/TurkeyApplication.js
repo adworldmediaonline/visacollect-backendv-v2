@@ -6,7 +6,24 @@ const supportingDocumentSchema = new mongoose.Schema(
     documentType: {
       type: String,
       required: true,
-      enum: ['Visa', 'Residence Permit'],
+      enum: [
+        'Visa',
+        'Residence Permit',
+        'Passport',
+        'Photo',
+        'Birth Certificate',
+        'Marriage Certificate',
+        'Bank Statement',
+        'Employment Letter',
+        'visa',
+        'residence permit',
+        'passport',
+        'photo',
+        'birth-certificate',
+        'marriage-certificate',
+        'bank-statement',
+        'employment-letter',
+      ],
     },
     issuingCountry: {
       type: String,
@@ -66,6 +83,19 @@ const documentUploadSchema = new mongoose.Schema(
         uploadedAt: {
           type: Date,
           default: Date.now,
+        },
+        size: {
+          type: Number,
+        },
+        format: {
+          type: String,
+          trim: true,
+        },
+        width: {
+          type: Number,
+        },
+        height: {
+          type: Number,
         },
       },
     ],

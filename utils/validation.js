@@ -132,11 +132,31 @@ export const applicantDetailsSchema = z.object({
 // Supporting Document Validation
 export const supportingDocumentSchema = z
   .object({
-    documentType: z.enum(['Visa', 'Residence Permit'], {
-      errorMap: () => ({
-        message: 'Document type must be either Visa or Residence Permit',
-      }),
-    }),
+    documentType: z.enum(
+      [
+        'Visa',
+        'Residence Permit',
+        'Passport',
+        'Photo',
+        'Birth Certificate',
+        'Marriage Certificate',
+        'Bank Statement',
+        'Employment Letter',
+        'visa',
+        'residence permit',
+        'passport',
+        'photo',
+        'birth-certificate',
+        'marriage-certificate',
+        'bank-statement',
+        'employment-letter',
+      ],
+      {
+        errorMap: () => ({
+          message: 'Invalid document type selected',
+        }),
+      }
+    ),
 
     issuingCountry: z
       .string()
@@ -193,6 +213,10 @@ export const documentUploadSchema = z
           url: z.string().url('Invalid document URL'),
           publicId: z.string().optional(),
           uploadedAt: z.string().optional(),
+          size: z.number().optional(),
+          format: z.string().optional(),
+          width: z.number().optional(),
+          height: z.number().optional(),
         })
       )
       .max(10, 'Maximum 10 additional documents allowed')
