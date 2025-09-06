@@ -35,72 +35,94 @@ export const createPayPalOrder = asyncHandler(async (req, res) => {
   }
 
   // Check if application can accept payments
-  if (!['documents_completed', 'submitted'].includes(application.status)) {
+  if (
+    !['documents_completed', 'submitted', 'paid'].includes(application.status)
+  ) {
     throw new AppError('Application is not ready for payment', 400);
   }
 
   // Check if payment already exists for this application
   const existingPayment = await Payment.findOne({
     applicationId,
-    status: { $in: ['CREATED', 'APPROVED', 'COMPLETED'] },
+    status: { $in: ['PENDING', 'CREATED', 'APPROVED', 'COMPLETED'] },
   });
 
-  if (existingPayment) {
-    throw new AppError('Payment already exists for this application', 400);
-  }
+  let payment;
+  let paypalOrder;
 
-  try {
+  if (existingPayment) {
+    // If payment is PENDING and has pendingCapture flag, reuse it
+    if (
+      existingPayment.status === 'PENDING' &&
+      existingPayment.metadata?.pendingCapture
+    ) {
+      console.log('Found existing PENDING payment, reusing it');
+      payment = existingPayment;
+    } else {
+      throw new AppError('Payment already exists for this application', 400);
+    }
+  } else {
     // Create PayPal order
-    const paypalOrder = await paypalService.createOrder(
+    paypalOrder = await paypalService.createOrder(
       amount,
       currency,
-      description || `Visa Application Payment - ${applicationId}`
+      description || `Visa Application Payment - ${applicationId}`,
+      applicationId
     );
 
     // Generate payment ID
     const paymentId = `PAY-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    // Create payment record
-    const payment = await Payment.create({
+    // Create temporary payment record with PENDING status
+    // This will be updated to COMPLETED only after successful capture
+    payment = await Payment.create({
       paymentId,
       applicationId,
       provider: 'PAYPAL',
       orderId: paypalOrder.id,
-      status: 'CREATED',
+      status: 'PENDING', // Changed from CREATED to PENDING
       amount: amount,
       currency: currency,
       metadata: {
         paypalOrder: paypalOrder,
         createdAt: new Date(),
+        pendingCapture: true, // Flag to indicate this needs capture
       },
       idempotencyKey: paypalService.constructor.generateIdempotencyKey(),
     });
+  }
 
-    // Find approval URL
-    const approvalUrl = paypalOrder.links.find(
+  let approvalUrl;
+
+  if (existingPayment) {
+    // If reusing existing payment, get approval URL from PayPal API
+    const orderDetails = await paypalService.getOrder(payment.orderId);
+    approvalUrl = orderDetails.links.find(
       (link) => link.rel === 'approve'
     )?.href;
-
-    if (!approvalUrl) {
-      throw new AppError('Failed to get PayPal approval URL', 500);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'PayPal order created successfully',
-      data: {
-        paymentId: payment.paymentId,
-        orderId: paypalOrder.id,
-        approvalUrl,
-        status: 'CREATED',
-        amount: amount,
-        currency: currency,
-      },
-    });
-  } catch (error) {
-    console.error('PayPal order creation error:', error);
-    throw new AppError('Failed to create PayPal order', 500);
+  } else {
+    // If new payment, get approval URL from created order
+    approvalUrl = paypalOrder.links.find(
+      (link) => link.rel === 'approve'
+    )?.href;
   }
+
+  if (!approvalUrl) {
+    throw new AppError('Failed to get PayPal approval URL', 500);
+  }
+
+  res.status(201).json({
+    success: true,
+    message: 'PayPal order created successfully',
+    data: {
+      paymentId: payment.paymentId,
+      orderId: payment.orderId,
+      approvalUrl,
+      status: payment.status,
+      amount: amount,
+      currency: currency,
+    },
+  });
 });
 
 // @desc    Capture PayPal payment
@@ -126,16 +148,103 @@ export const capturePayPalOrder = asyncHandler(async (req, res) => {
   }
 
   // Check if payment can be captured
-  if (!payment.canBeCaptured()) {
-    throw new AppError(
-      `Payment cannot be captured. Current status: ${payment.status}`,
-      400
-    );
-  }
+  // Allow capture if status is APPROVED, or if we can update it to APPROVED from PayPal
+  let canProceed = payment.canBeCaptured();
 
   try {
-    // Capture PayPal order
-    const captureResult = await paypalService.captureOrder(orderId);
+    // First, check the current PayPal order status and update our database
+    console.log(`Checking PayPal order status for orderId: ${orderId}`);
+    const orderDetails = await paypalService.getOrder(orderId);
+    console.log(
+      `PayPal order status: ${orderDetails.status}, DB payment status: ${payment.status}`
+    );
+
+    // Update payment status based on PayPal order status
+    if (orderDetails.status === 'APPROVED') {
+      if (!canProceed) {
+        payment.status = 'APPROVED';
+        await payment.save();
+        canProceed = true;
+      }
+    } else if (orderDetails.status === 'COMPLETED') {
+      // Order has already been captured/completed
+      console.log('Order already completed, updating payment record');
+      payment.status = 'COMPLETED';
+      payment.transactionId =
+        orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+      payment.paypalFee =
+        orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.paypal_fee?.value;
+      payment.payerEmail = orderDetails.payer?.email_address;
+      payment.payerId = orderDetails.payer?.payer_id;
+      payment.paymentMethod =
+        orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.payment_source?.paypal?.name;
+      await payment.save();
+
+      // Return success since order is already completed
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already completed',
+        data: {
+          paymentId: payment.paymentId,
+          orderId: orderId,
+          status: 'COMPLETED',
+          transactionId: payment.transactionId,
+        },
+      });
+    } else if (orderDetails.status === 'CREATED') {
+      // Order is still created, this means user hasn't completed approval yet
+      throw new AppError(
+        'Payment has not been approved by the user yet. Please complete the PayPal approval process.',
+        400
+      );
+    } else {
+      throw new AppError(
+        `Invalid PayPal order status for capture: ${orderDetails.status}`,
+        400
+      );
+    }
+
+    // Double-check we can proceed with capture
+    if (!canProceed) {
+      throw new AppError(
+        `Payment cannot be captured. PayPal status: ${orderDetails.status}, DB status: ${payment.status}`,
+        400
+      );
+    }
+
+    // Now capture the approved order
+    let captureResult;
+    try {
+      captureResult = await paypalService.captureOrder(orderId);
+    } catch (captureError) {
+      // Handle specific PayPal errors
+      if (captureError.message?.includes('ORDER_ALREADY_CAPTURED')) {
+        console.log('Order already captured, updating payment record');
+        // Update payment record as completed
+        payment.status = 'COMPLETED';
+        payment.transactionId =
+          orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+        payment.paypalFee =
+          orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.paypal_fee?.value;
+        payment.payerEmail = orderDetails.payer?.email_address;
+        payment.payerId = orderDetails.payer?.payer_id;
+        payment.paymentMethod =
+          orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.seller_receivable_breakdown?.payment_source?.paypal?.name;
+        await payment.save();
+
+        return res.status(200).json({
+          success: true,
+          message: 'Payment already completed',
+          data: {
+            paymentId: payment.paymentId,
+            orderId: orderId,
+            status: 'COMPLETED',
+            transactionId: payment.transactionId,
+          },
+        });
+      }
+      throw captureError;
+    }
 
     // Update payment record
     payment.status = 'COMPLETED';

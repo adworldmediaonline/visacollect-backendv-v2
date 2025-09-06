@@ -100,7 +100,8 @@ class PayPalService {
   async createOrder(
     amount,
     currency = 'USD',
-    description = 'Visa Application Payment'
+    description = 'Visa Application Payment',
+    applicationId = ''
   ) {
     const orderData = {
       intent: 'CAPTURE',
@@ -114,10 +115,8 @@ class PayPalService {
         },
       ],
       application_context: {
-        return_url:
-          secret.frontendUrl || 'http://localhost:3000/payment/success',
-        cancel_url:
-          secret.frontendUrl || 'http://localhost:3000/payment/cancel',
+        return_url: `${secret.frontendUrl}/tr/apply/payment?id=${applicationId}`,
+        cancel_url: `${secret.frontendUrl}/tr/apply/payment-cancel?id=${applicationId}`,
         user_action: 'PAY_NOW',
         brand_name: 'Visa Collect',
       },

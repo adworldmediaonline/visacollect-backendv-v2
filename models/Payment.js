@@ -33,6 +33,7 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
+        'PENDING',
         'CREATED',
         'APPROVED',
         'COMPLETED',
@@ -40,7 +41,7 @@ const paymentSchema = new mongoose.Schema(
         'REFUNDED',
         'CANCELLED',
       ],
-      default: 'CREATED',
+      default: 'PENDING',
     },
     amount: {
       type: mongoose.Decimal128,
@@ -79,7 +80,7 @@ const paymentSchema = new mongoose.Schema(
     webhookEvents: [
       {
         eventType: { type: String, required: true },
-        eventId: { type: String, required: true, unique: true },
+        eventId: { type: String, required: true },
         resource: { type: mongoose.Schema.Types.Mixed },
         receivedAt: { type: Date, default: Date.now },
       },
@@ -126,7 +127,7 @@ paymentSchema.methods.isCompleted = function () {
 
 // Method to check if payment can be captured
 paymentSchema.methods.canBeCaptured = function () {
-  return this.status === 'APPROVED';
+  return this.status === 'APPROVED' || this.status === 'PENDING';
 };
 
 // Method to check if payment can be refunded
