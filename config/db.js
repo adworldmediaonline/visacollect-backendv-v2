@@ -43,17 +43,27 @@ const logger = winston.createLogger({
 const connectionOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
+  maxPoolSize: isServerless ? 1 : 10, // Reduce pool size for serverless
+  serverSelectionTimeoutMS: isServerless ? 10000 : 5000, // Increase timeout for serverless
+  socketTimeoutMS: isServerless ? 30000 : 45000, // Reduce socket timeout for serverless
+  bufferCommands: false, // Disable mongoose buffering
+  bufferMaxEntries: 0, // Disable mongoose buffering
 };
 
 // Connect to MongoDB
 const connectDB = async () => {
   try {
+    logger.info('Attempting to connect to MongoDB...', {
+      isServerless,
+      mongodbUri: mongodbUri ? 'URI provided' : 'URI missing',
+    });
+
     const conn = await mongoose.connect(mongodbUri, connectionOptions);
 
-    logger.info(`MongoDB Connected: ${conn.connection.host}`);
+    logger.info(`MongoDB Connected: ${conn.connection.host}`, {
+      readyState: conn.connection.readyState,
+      name: conn.connection.name,
+    });
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
@@ -68,15 +78,23 @@ const connectDB = async () => {
       logger.info('MongoDB reconnected');
     });
 
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      logger.info('MongoDB connection closed through app termination');
-      process.exit(0);
-    });
+    // Graceful shutdown (only for non-serverless)
+    if (!isServerless) {
+      process.on('SIGINT', async () => {
+        await mongoose.connection.close();
+        logger.info('MongoDB connection closed through app termination');
+        process.exit(0);
+      });
+    }
+
+    return conn;
   } catch (error) {
-    logger.error('MongoDB connection failed:', error.message);
-    process.exit(1);
+    logger.error('MongoDB connection failed:', {
+      error: error.message,
+      stack: error.stack,
+      mongodbUri: mongodbUri ? 'URI provided' : 'URI missing',
+    });
+    throw error; // Re-throw to let caller handle
   }
 };
 

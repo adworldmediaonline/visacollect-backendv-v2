@@ -81,18 +81,22 @@ app.use('/api/v1/turkey', turkeyVisaRoutes);
 app.use(errorHandler);
 
 // Database connection for Vercel serverless
-let isConnected = false;
+let cachedConnection = null;
 
 const connectToDatabase = async () => {
-  if (!isConnected) {
-    try {
-      await connectDB();
-      isConnected = true;
-      logger.info('Database connected successfully');
-    } catch (error) {
-      logger.error('Database connection failed:', error.message);
-      throw error;
-    }
+  // Reuse cached connection if available
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    return cachedConnection;
+  }
+
+  try {
+    cachedConnection = await connectDB();
+    return cachedConnection;
+  } catch (error) {
+    logger.error('Database connection failed:', error.message);
+    // Reset cached connection on error
+    cachedConnection = null;
+    throw error;
   }
 };
 
@@ -102,12 +106,27 @@ app.use(async (req, res, next) => {
     await connectToDatabase();
     next();
   } catch (error) {
-    logger.error('Database connection middleware error:', error.message);
+    logger.error('Database connection middleware error:', {
+      message: error.message,
+      stack: error.stack,
+      mongodbUri: secret.mongodbUri ? 'URI configured' : 'URI missing',
+    });
+
+    // More specific error messages
+    let errorMessage = 'Database connection failed';
+    if (!secret.mongodbUri) {
+      errorMessage = 'Database URI not configured';
+    } else if (error.message.includes('authentication failed')) {
+      errorMessage = 'Database authentication failed';
+    } else if (error.message.includes('getaddrinfo ENOTFOUND')) {
+      errorMessage = 'Database host not found';
+    }
+
     return res.status(500).json({
       success: false,
       error: {
         code: 'DATABASE_ERROR',
-        message: 'Database connection failed',
+        message: errorMessage,
       },
     });
   }
