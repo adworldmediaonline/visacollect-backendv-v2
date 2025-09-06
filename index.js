@@ -18,10 +18,10 @@ import paymentRoutes from './routes/payment.js';
 import turkeyVisaRoutes from './routes/turkeyVisa.js';
 
 // Import middleware
+import connectDB from './config/db.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 // Import database connection and logger
-import { connectDB, logger } from './config/db.js';
 
 // Create Express application
 const app = express();
@@ -46,6 +46,8 @@ if (secret.nodeEnv === 'development') {
 } else {
   app.use(morgan('combined'));
 }
+
+connectDB();
 
 // Health check route
 app.use('/', healthRoutes);
@@ -80,67 +82,5 @@ app.use('/api/v1/turkey', turkeyVisaRoutes);
 // Global error handling middleware (must be last)
 app.use(errorHandler);
 
-// Database connection for Vercel serverless
-let isConnected = false;
-
-const connectToDatabase = async () => {
-  if (!isConnected) {
-    try {
-      await connectDB();
-      isConnected = true;
-      logger.info('Database connected successfully');
-    } catch (error) {
-      logger.error('Database connection failed:', error.message);
-      throw error;
-    }
-  }
-};
-
-// Middleware to ensure database connection
-app.use(async (req, res, next) => {
-  try {
-    await connectToDatabase();
-    next();
-  } catch (error) {
-    logger.error('Database connection middleware error:', error.message);
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: 'DATABASE_ERROR',
-        message: 'Database connection failed',
-      },
-    });
-  }
-});
-
 // For Vercel deployment - export the app as a serverless function
 export default app;
-
-// Local development server startup
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-
-  const startServer = async () => {
-    try {
-      // Connect to database first
-      await connectToDatabase();
-
-      app.listen(PORT, () => {
-        logger.info(
-          `🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
-        );
-        logger.info(
-          `📊 Health check available at: http://localhost:${PORT}/health`
-        );
-        logger.info(
-          `🔐 Better Auth available at: http://localhost:${PORT}/api/auth`
-        );
-      });
-    } catch (error) {
-      logger.error('❌ Failed to start server:', error.message);
-      process.exit(1);
-    }
-  };
-
-  startServer();
-}

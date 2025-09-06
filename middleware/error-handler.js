@@ -1,5 +1,3 @@
-import { logger } from '../config/db.js';
-
 // Custom Error class for operational errors
 export class AppError extends Error {
   constructor(message, statusCode = 500, isOperational = true) {
@@ -67,8 +65,6 @@ const sendErrorProd = (err, res) => {
     });
   } else {
     // Programming or other unknown error: don't leak error details
-    logger.error('ERROR 💥', err);
-
     res.status(500).json({
       success: false,
       error: {
@@ -83,15 +79,6 @@ const sendErrorProd = (err, res) => {
 export const errorHandler = (err, req, res, _next) => {
   let error = { ...err };
   error.message = err.message;
-
-  // Log error
-  logger.error('Error occurred:', {
-    message: err.message,
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-    ip: req.ip,
-  });
 
   // Handle specific error types
   if (
