@@ -63,6 +63,25 @@ export const startApplicationSchema = z.object({
 
 // Step 2: Applicant Details Validation
 export const applicantDetailsSchema = z.object({
+  arrivalDate: z.string().refine((date) => {
+    const selectedDate = new Date(date);
+    const today = new Date();
+
+    // Set both dates to start of day for fair comparison
+    const selectedDateStart = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate()
+    );
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    return isValidDate(selectedDate) && selectedDateStart >= todayStart;
+  }, 'Arrival date must be today or in the future'),
+
   givenNames: z
     .string()
     .min(1, 'Given names are required')

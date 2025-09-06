@@ -89,6 +89,10 @@ const documentUploadSchema = new mongoose.Schema(
 // Applicant Details Schema
 const applicantDetailsSchema = new mongoose.Schema(
   {
+    arrivalDate: {
+      type: Date,
+      required: true,
+    },
     givenNames: {
       type: String,
       required: true,

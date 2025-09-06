@@ -168,6 +168,7 @@ export const saveApplicantDetails = asyncHandler(async (req, res) => {
   // Update application with main applicant details
   application.mainApplicant = {
     ...validation.data,
+    arrivalDate: new Date(validation.data.arrivalDate),
     dateOfBirth: new Date(validation.data.dateOfBirth),
     passportIssueDate: new Date(validation.data.passportIssueDate),
     passportExpiryDate: new Date(validation.data.passportExpiryDate),
@@ -331,6 +332,7 @@ export const addApplicant = asyncHandler(async (req, res) => {
   // Add new applicant
   const newApplicant = {
     ...validation.data.applicant,
+    arrivalDate: new Date(validation.data.applicant.arrivalDate),
     dateOfBirth: new Date(validation.data.applicant.dateOfBirth),
     passportIssueDate: new Date(validation.data.applicant.passportIssueDate),
     passportExpiryDate: new Date(validation.data.applicant.passportExpiryDate),
@@ -525,6 +527,7 @@ export const updateApplicantDetails = asyncHandler(async (req, res) => {
   // Update application with main applicant details
   application.mainApplicant = {
     ...validation.data,
+    arrivalDate: new Date(validation.data.arrivalDate),
     dateOfBirth: new Date(validation.data.dateOfBirth),
     passportIssueDate: new Date(validation.data.passportIssueDate),
     passportExpiryDate: new Date(validation.data.passportExpiryDate),
@@ -600,6 +603,7 @@ export const updateApplicant = asyncHandler(async (req, res) => {
   // Update the applicant at the specified index
   const updatedApplicant = {
     ...validation.data.applicant,
+    arrivalDate: new Date(validation.data.applicant.arrivalDate),
     dateOfBirth: new Date(validation.data.applicant.dateOfBirth),
     passportIssueDate: new Date(validation.data.applicant.passportIssueDate),
     passportExpiryDate: new Date(validation.data.applicant.passportExpiryDate),
