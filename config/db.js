@@ -47,7 +47,6 @@ const connectionOptions = {
   serverSelectionTimeoutMS: isServerless ? 10000 : 5000, // Increase timeout for serverless
   socketTimeoutMS: isServerless ? 30000 : 45000, // Reduce socket timeout for serverless
   bufferCommands: false, // Disable mongoose buffering
-  bufferMaxEntries: 0, // Disable mongoose buffering
 };
 
 // Connect to MongoDB
