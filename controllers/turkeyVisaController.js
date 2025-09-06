@@ -49,7 +49,8 @@ export const startApplication = asyncHandler(async (req, res) => {
     throw new AppError('Validation failed', 400, true);
   }
 
-  const { passportCountry, visaType, destination, email } = validation.data;
+  const { passportCountry, travelDocument, visaType, destination, email } =
+    validation.data;
 
   // Check if country is supported
   const supportedCountries = getSupportedCountries();
@@ -93,6 +94,7 @@ export const startApplication = asyncHandler(async (req, res) => {
   await TurkeyApplication.create({
     applicationId,
     passportCountry,
+    travelDocument,
     visaType,
     destination,
     email,
@@ -455,7 +457,8 @@ export const updateApplication = asyncHandler(async (req, res) => {
     throw new AppError('Validation failed', 400, true);
   }
 
-  const { passportCountry, visaType, destination, email } = validation.data;
+  const { passportCountry, travelDocument, visaType, destination, email } =
+    validation.data;
   const { applicationId } = req.params;
 
   // Check if application exists
@@ -477,6 +480,7 @@ export const updateApplication = asyncHandler(async (req, res) => {
 
   // Update application
   existingApplication.passportCountry = passportCountry;
+  existingApplication.travelDocument = travelDocument;
   existingApplication.visaType = visaType;
   existingApplication.destination = destination;
   existingApplication.email = email;

@@ -40,6 +40,13 @@ export const startApplicationSchema = z.object({
     .min(1, 'Passport country is required')
     .max(100, 'Passport country name is too long'),
 
+  travelDocument: z
+    .string()
+    .min(1, 'Travel document is required')
+    .refine((val) => val === 'Ordinary Passport', {
+      message: 'Only Ordinary Passport is currently supported',
+    }),
+
   visaType: z
     .string()
     .default('Electronic Visa')

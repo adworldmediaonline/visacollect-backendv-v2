@@ -156,6 +156,11 @@ const turkeyApplicationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    travelDocument: {
+      type: String,
+      required: true,
+      default: 'Ordinary Passport',
+    },
     visaType: {
       type: String,
       required: true,
