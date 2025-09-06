@@ -40,6 +40,13 @@ export const startApplicationSchema = z.object({
     .min(1, 'Passport country is required')
     .max(100, 'Passport country name is too long'),
 
+  travelDocument: z
+    .string()
+    .min(1, 'Travel document is required')
+    .refine((val) => val === 'Ordinary Passport', {
+      message: 'Only Ordinary Passport is currently supported',
+    }),
+
   visaType: z
     .string()
     .default('Electronic Visa')
@@ -63,6 +70,25 @@ export const startApplicationSchema = z.object({
 
 // Step 2: Applicant Details Validation
 export const applicantDetailsSchema = z.object({
+  arrivalDate: z.string().refine((date) => {
+    const selectedDate = new Date(date);
+    const today = new Date();
+
+    // Set both dates to start of day for fair comparison
+    const selectedDateStart = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate()
+    );
+    const todayStart = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    return isValidDate(selectedDate) && selectedDateStart >= todayStart;
+  }, 'Arrival date must be today or in the future'),
+
   givenNames: z
     .string()
     .min(1, 'Given names are required')
@@ -132,11 +158,14 @@ export const applicantDetailsSchema = z.object({
 // Supporting Document Validation
 export const supportingDocumentSchema = z
   .object({
-    documentType: z.enum(['Visa', 'Residence Permit'], {
-      errorMap: () => ({
-        message: 'Document type must be either Visa or Residence Permit',
-      }),
-    }),
+    documentType: z.enum(
+      ['Visa', 'Residence Permit', 'visa', 'residence-permit'],
+      {
+        errorMap: () => ({
+          message: 'Invalid document type selected',
+        }),
+      }
+    ),
 
     issuingCountry: z
       .string()
@@ -193,6 +222,10 @@ export const documentUploadSchema = z
           url: z.string().url('Invalid document URL'),
           publicId: z.string().optional(),
           uploadedAt: z.string().optional(),
+          size: z.number().optional(),
+          format: z.string().optional(),
+          width: z.number().optional(),
+          height: z.number().optional(),
         })
       )
       .max(10, 'Maximum 10 additional documents allowed')

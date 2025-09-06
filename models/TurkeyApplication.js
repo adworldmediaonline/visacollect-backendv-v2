@@ -6,7 +6,7 @@ const supportingDocumentSchema = new mongoose.Schema(
     documentType: {
       type: String,
       required: true,
-      enum: ['Visa', 'Residence Permit'],
+      enum: ['Visa', 'Residence Permit', 'visa', 'residence-permit'],
     },
     issuingCountry: {
       type: String,
@@ -67,6 +67,19 @@ const documentUploadSchema = new mongoose.Schema(
           type: Date,
           default: Date.now,
         },
+        size: {
+          type: Number,
+        },
+        format: {
+          type: String,
+          trim: true,
+        },
+        width: {
+          type: Number,
+        },
+        height: {
+          type: Number,
+        },
       },
     ],
   },
@@ -76,6 +89,10 @@ const documentUploadSchema = new mongoose.Schema(
 // Applicant Details Schema
 const applicantDetailsSchema = new mongoose.Schema(
   {
+    arrivalDate: {
+      type: Date,
+      required: true,
+    },
     givenNames: {
       type: String,
       required: true,
@@ -138,6 +155,11 @@ const turkeyApplicationSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    travelDocument: {
+      type: String,
+      required: true,
+      default: 'Ordinary Passport',
     },
     visaType: {
       type: String,

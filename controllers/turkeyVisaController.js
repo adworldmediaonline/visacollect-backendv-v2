@@ -49,7 +49,8 @@ export const startApplication = asyncHandler(async (req, res) => {
     throw new AppError('Validation failed', 400, true);
   }
 
-  const { passportCountry, visaType, destination, email } = validation.data;
+  const { passportCountry, travelDocument, visaType, destination, email } =
+    validation.data;
 
   // Check if country is supported
   const supportedCountries = getSupportedCountries();
@@ -60,18 +61,7 @@ export const startApplication = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check if user already has a draft application
-  const existingDraft = await TurkeyApplication.findOne({
-    email,
-    status: { $in: ['draft', 'started'] },
-  });
-
-  if (existingDraft) {
-    throw new AppError(
-      `You already have a draft application (${existingDraft.applicationId}). Please complete it first.`,
-      400
-    );
-  }
+  // Allow multiple applications with same email - no restriction
 
   // Generate unique application ID
   let applicationId;
@@ -104,6 +94,7 @@ export const startApplication = asyncHandler(async (req, res) => {
   await TurkeyApplication.create({
     applicationId,
     passportCountry,
+    travelDocument,
     visaType,
     destination,
     email,
@@ -179,6 +170,7 @@ export const saveApplicantDetails = asyncHandler(async (req, res) => {
   // Update application with main applicant details
   application.mainApplicant = {
     ...validation.data,
+    arrivalDate: new Date(validation.data.arrivalDate),
     dateOfBirth: new Date(validation.data.dateOfBirth),
     passportIssueDate: new Date(validation.data.passportIssueDate),
     passportExpiryDate: new Date(validation.data.passportExpiryDate),
@@ -257,6 +249,56 @@ export const uploadDocuments = asyncHandler(async (req, res) => {
   });
 });
 
+export const updateDocuments = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { documents } = req.body;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if application has main applicant
+  if (!application.mainApplicant) {
+    throw new AppError('Please complete applicant details first', 400);
+  }
+
+  // Check if application has existing documents to update
+  if (!application.mainApplicant.documents) {
+    throw new AppError('No documents found to update', 400);
+  }
+
+  // Validate document data
+  const validation = validateData(documentUploadSchema, documents);
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  // Update main applicant documents
+  application.mainApplicant.documents = validation.data;
+
+  application.updatedAt = new Date();
+
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Documents updated successfully',
+    data: {
+      applicationId,
+      status: application.status,
+      currentStep: application.currentStep,
+      documents: application.mainApplicant.documents,
+      updatedAt: application.updatedAt,
+    },
+  });
+});
+
 // @desc    Add additional applicant (Step 4)
 // @route   POST /api/v1/turkey/add-applicant
 // @access  Public
@@ -292,6 +334,7 @@ export const addApplicant = asyncHandler(async (req, res) => {
   // Add new applicant
   const newApplicant = {
     ...validation.data.applicant,
+    arrivalDate: new Date(validation.data.applicant.arrivalDate),
     dateOfBirth: new Date(validation.data.applicant.dateOfBirth),
     passportIssueDate: new Date(validation.data.applicant.passportIssueDate),
     passportExpiryDate: new Date(validation.data.applicant.passportExpiryDate),
@@ -407,6 +450,110 @@ export const submitApplication = asyncHandler(async (req, res) => {
 // @desc    Get supported countries
 // @route   GET /api/v1/turkey/countries
 // @access  Public
+export const updateApplication = asyncHandler(async (req, res) => {
+  // Validate input data
+  const validation = validateData(startApplicationSchema, req.body);
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  const { passportCountry, travelDocument, visaType, destination, email } =
+    validation.data;
+  const { applicationId } = req.params;
+
+  // Check if application exists
+  const existingApplication = await TurkeyApplication.findOne({
+    applicationId,
+  });
+  if (!existingApplication) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if country is supported
+  const supportedCountries = getSupportedCountries();
+  if (!supportedCountries.includes(passportCountry)) {
+    throw new AppError(
+      `Visa service not available for ${passportCountry}`,
+      400
+    );
+  }
+
+  // Update application
+  existingApplication.passportCountry = passportCountry;
+  existingApplication.travelDocument = travelDocument;
+  existingApplication.visaType = visaType;
+  existingApplication.destination = destination;
+  existingApplication.email = email;
+  existingApplication.updatedAt = new Date();
+
+  await existingApplication.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Application updated successfully',
+    data: {
+      applicationId: existingApplication.applicationId,
+      passportCountry: existingApplication.passportCountry,
+      visaType: existingApplication.visaType,
+      destination: existingApplication.destination,
+      email: existingApplication.email,
+      status: existingApplication.status,
+      updatedAt: existingApplication.updatedAt,
+    },
+  });
+});
+
+export const updateApplicantDetails = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { applicantDetails } = req.body;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if application has applicant details to update
+  if (!application.mainApplicant) {
+    throw new AppError('No applicant details found to update', 400);
+  }
+
+  // Validate applicant details
+  const validation = validateData(applicantDetailsSchema, applicantDetails);
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  // Update application with main applicant details
+  application.mainApplicant = {
+    ...validation.data,
+    arrivalDate: new Date(validation.data.arrivalDate),
+    dateOfBirth: new Date(validation.data.dateOfBirth),
+    passportIssueDate: new Date(validation.data.passportIssueDate),
+    passportExpiryDate: new Date(validation.data.passportExpiryDate),
+  };
+
+  application.updatedAt = new Date();
+
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Applicant details updated successfully',
+    data: {
+      applicationId,
+      status: application.status,
+      currentStep: application.currentStep,
+      mainApplicant: application.mainApplicant,
+      updatedAt: application.updatedAt,
+    },
+  });
+});
+
 export const getSupportedCountriesList = asyncHandler(async (req, res) => {
   const countries = getSupportedCountries();
 
@@ -414,5 +561,119 @@ export const getSupportedCountriesList = asyncHandler(async (req, res) => {
     success: true,
     data: countries,
     count: countries.length,
+  });
+});
+
+// @desc    Update a specific additional applicant
+// @route   PUT /api/v1/turkey/add-applicant/:applicationId/:index
+// @access  Public
+export const updateApplicant = asyncHandler(async (req, res) => {
+  const { applicationId, index } = req.params;
+  const { applicant } = req.body;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  if (index === undefined || index === null) {
+    throw new AppError('Applicant index is required', 400);
+  }
+
+  const applicantIndex = parseInt(index);
+  if (isNaN(applicantIndex) || applicantIndex < 0) {
+    throw new AppError('Invalid applicant index', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if index exists
+  if (
+    !application.additionalApplicants ||
+    applicantIndex >= application.additionalApplicants.length
+  ) {
+    throw new AppError('Applicant not found at specified index', 404);
+  }
+
+  // Validate applicant data
+  const validation = validateData(addApplicantSchema, { applicant });
+  if (!validation.success) {
+    throw new AppError('Validation failed', 400, true);
+  }
+
+  // Update the applicant at the specified index
+  const updatedApplicant = {
+    ...validation.data.applicant,
+    arrivalDate: new Date(validation.data.applicant.arrivalDate),
+    dateOfBirth: new Date(validation.data.applicant.dateOfBirth),
+    passportIssueDate: new Date(validation.data.applicant.passportIssueDate),
+    passportExpiryDate: new Date(validation.data.applicant.passportExpiryDate),
+  };
+
+  application.additionalApplicants[applicantIndex] = updatedApplicant;
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Additional applicant updated successfully',
+    data: {
+      applicationId,
+      updatedApplicant: application.additionalApplicants[applicantIndex],
+      index: applicantIndex,
+    },
+  });
+});
+
+// @desc    Delete a specific additional applicant
+// @route   DELETE /api/v1/turkey/add-applicant/:applicationId/:index
+// @access  Public
+export const deleteApplicant = asyncHandler(async (req, res) => {
+  const { applicationId, index } = req.params;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  if (index === undefined || index === null) {
+    throw new AppError('Applicant index is required', 400);
+  }
+
+  const applicantIndex = parseInt(index);
+  if (isNaN(applicantIndex) || applicantIndex < 0) {
+    throw new AppError('Invalid applicant index', 400);
+  }
+
+  // Find application
+  const application = await TurkeyApplication.findOne({ applicationId });
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  // Check if index exists
+  if (
+    !application.additionalApplicants ||
+    applicantIndex >= application.additionalApplicants.length
+  ) {
+    throw new AppError('Applicant not found at specified index', 404);
+  }
+
+  // Remove the applicant at the specified index
+  const deletedApplicant = application.additionalApplicants.splice(
+    applicantIndex,
+    1
+  )[0];
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Additional applicant deleted successfully',
+    data: {
+      applicationId,
+      deletedApplicant,
+      index: applicantIndex,
+    },
   });
 });
