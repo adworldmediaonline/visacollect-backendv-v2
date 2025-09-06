@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AppError, asyncHandler } from '../middleware/error-handler.js';
 import Payment from '../models/Payment.js';
 import TurkeyApplication from '../models/TurkeyApplication.js';
+import { sendPaymentSuccessEmail } from '../utils/application.js';
 import paypalService from '../utils/paypal.js';
 import {
   capturePaymentSchema,
@@ -180,6 +181,29 @@ export const capturePayPalOrder = asyncHandler(async (req, res) => {
         orderDetails.purchase_units?.[0]?.payments?.captures?.[0]?.payment_source?.paypal?.name;
       await payment.save();
 
+      // Send payment success email
+      try {
+        const application = await TurkeyApplication.findOne({ applicationId });
+        if (application) {
+          await sendPaymentSuccessEmail(
+            application.email,
+            applicationId,
+            {
+              transactionId: payment.transactionId,
+              amount: payment.amount,
+              paymentMethod: payment.paymentMethod,
+            },
+            {
+              totalApplicants:
+                (application.additionalApplicants?.length || 0) + 1,
+            }
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send payment success email:', emailError);
+        // Don't fail the payment if email fails
+      }
+
       // Return success since order is already completed
       return res.status(200).json({
         success: true,
@@ -274,6 +298,28 @@ export const capturePayPalOrder = asyncHandler(async (req, res) => {
     if (application && application.status === 'submitted') {
       application.status = 'paid';
       await application.save();
+    }
+
+    // Send payment success email
+    try {
+      if (application) {
+        await sendPaymentSuccessEmail(
+          application.email,
+          applicationId,
+          {
+            transactionId: payment.transactionId,
+            amount: payment.amount,
+            paymentMethod: payment.paymentMethod,
+          },
+          {
+            totalApplicants:
+              (application.additionalApplicants?.length || 0) + 1,
+          }
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send payment success email:', emailError);
+      // Don't fail the payment if email fails
     }
 
     res.status(200).json({
