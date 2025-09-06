@@ -18,10 +18,10 @@ import paymentRoutes from './routes/payment.js';
 import turkeyVisaRoutes from './routes/turkeyVisa.js';
 
 // Import middleware
+import connectDB from './config/db.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 // Import database connection and logger
-import { connectDB, logger } from './config/db.js';
 
 // Create Express application
 const app = express();
@@ -46,6 +46,8 @@ if (secret.nodeEnv === 'development') {
 } else {
   app.use(morgan('combined'));
 }
+
+connectDB();
 
 // Health check route
 app.use('/', healthRoutes);
@@ -80,86 +82,5 @@ app.use('/api/v1/turkey', turkeyVisaRoutes);
 // Global error handling middleware (must be last)
 app.use(errorHandler);
 
-// Database connection for Vercel serverless
-let cachedConnection = null;
-
-const connectToDatabase = async () => {
-  // Reuse cached connection if available
-  if (cachedConnection && mongoose.connection.readyState === 1) {
-    return cachedConnection;
-  }
-
-  try {
-    cachedConnection = await connectDB();
-    return cachedConnection;
-  } catch (error) {
-    logger.error('Database connection failed:', error.message);
-    // Reset cached connection on error
-    cachedConnection = null;
-    throw error;
-  }
-};
-
-// Middleware to ensure database connection
-app.use(async (req, res, next) => {
-  try {
-    await connectToDatabase();
-    next();
-  } catch (error) {
-    logger.error('Database connection middleware error:', {
-      message: error.message,
-      stack: error.stack,
-      mongodbUri: secret.mongodbUri ? 'URI configured' : 'URI missing',
-    });
-
-    // More specific error messages
-    let errorMessage = 'Database connection failed';
-    if (!secret.mongodbUri) {
-      errorMessage = 'Database URI not configured';
-    } else if (error.message.includes('authentication failed')) {
-      errorMessage = 'Database authentication failed';
-    } else if (error.message.includes('getaddrinfo ENOTFOUND')) {
-      errorMessage = 'Database host not found';
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: 'DATABASE_ERROR',
-        message: errorMessage,
-      },
-    });
-  }
-});
-
 // For Vercel deployment - export the app as a serverless function
 export default app;
-
-// Local development server startup
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-
-  const startServer = async () => {
-    try {
-      // Connect to database first
-      await connectToDatabase();
-
-      app.listen(PORT, () => {
-        logger.info(
-          `🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
-        );
-        logger.info(
-          `📊 Health check available at: http://localhost:${PORT}/health`
-        );
-        logger.info(
-          `🔐 Better Auth available at: http://localhost:${PORT}/api/auth`
-        );
-      });
-    } catch (error) {
-      logger.error('❌ Failed to start server:', error.message);
-      process.exit(1);
-    }
-  };
-
-  startServer();
-}

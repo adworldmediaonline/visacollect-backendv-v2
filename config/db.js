@@ -1,102 +1,36 @@
+import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import winston from 'winston';
-import { secret } from './env.js';
+dotenv.config();
 
-const { logLevel, mongodbUri } = secret;
+const MONGODB_URI = process.env.MONGODB_URI;
 
-// Check if we're in a serverless environment (Vercel, Netlify, etc.)
-const isServerless =
-  process.env.VERCEL || process.env.NETLIFY || process.env.LAMBDA_TASK_ROOT;
+if (!MONGODB_URI) {
+  throw new Error(
+    'Please define the MONGODB_URI environment variable inside .env.local'
+  );
+}
 
-// Configure Winston logger
-const logger = winston.createLogger({
-  level: logLevel || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  transports: [
-    // Always include console transport
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      ),
-    }),
-    // Only add file transports if not in serverless environment
-    ...(isServerless
-      ? []
-      : [
-          new winston.transports.File({
-            filename: 'logs/error.log',
-            level: 'error',
-          }),
-          new winston.transports.File({
-            filename: 'logs/combined.log',
-          }),
-        ]),
-  ],
-});
+let cached = global.mongoose;
 
-// MongoDB connection options
-const connectionOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  maxPoolSize: isServerless ? 1 : 10, // Reduce pool size for serverless
-  serverSelectionTimeoutMS: isServerless ? 10000 : 5000, // Increase timeout for serverless
-  socketTimeoutMS: isServerless ? 30000 : 45000, // Reduce socket timeout for serverless
-  bufferCommands: false, // Disable mongoose buffering
-};
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
-// Connect to MongoDB
-const connectDB = async () => {
-  try {
-    logger.info('Attempting to connect to MongoDB...', {
-      isServerless,
-      mongodbUri: mongodbUri ? 'URI provided' : 'URI missing',
-    });
-
-    const conn = await mongoose.connect(mongodbUri, connectionOptions);
-
-    logger.info(`MongoDB Connected: ${conn.connection.host}`, {
-      readyState: conn.connection.readyState,
-      name: conn.connection.name,
-    });
-
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      logger.error('MongoDB connection error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      logger.warn('MongoDB disconnected');
-    });
-
-    mongoose.connection.on('reconnected', () => {
-      logger.info('MongoDB reconnected');
-    });
-
-    // Graceful shutdown (only for non-serverless)
-    if (!isServerless) {
-      process.on('SIGINT', async () => {
-        await mongoose.connection.close();
-        logger.info('MongoDB connection closed through app termination');
-        process.exit(0);
-      });
-    }
-
-    return conn;
-  } catch (error) {
-    logger.error('MongoDB connection failed:', {
-      error: error.message,
-      stack: error.stack,
-      mongodbUri: mongodbUri ? 'URI provided' : 'URI missing',
-    });
-    throw error; // Re-throw to let caller handle
+export default async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
   }
-};
-
-// Export the connection function and logger
-export { connectDB, logger };
-export default connectDB;
+  if (!cached.promise) {
+    cached.promise = mongoose
+      .connect(MONGODB_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        // Add more options as needed
+      })
+      .then((mongoose) => {
+        return mongoose;
+      });
+  }
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
