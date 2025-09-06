@@ -82,5 +82,8 @@ app.use('/api/v1/turkey', turkeyVisaRoutes);
 // Global error handling middleware (must be last)
 app.use(errorHandler);
 
-// For Vercel deployment - export the app as a serverless function
+app.listen(secret.port, () => {
+  console.log(`Server is running on port ${secret.port}`);
+});
+
 export default app;
