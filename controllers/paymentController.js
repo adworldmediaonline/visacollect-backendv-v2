@@ -488,6 +488,56 @@ export const getPaymentStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get payment by application ID
+// @route   GET /api/v1/payment/application/:applicationId
+// @access  Public
+export const getPaymentByApplicationId = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+
+  if (!applicationId) {
+    throw new AppError('Application ID is required', 400);
+  }
+
+  // Find payment by application ID
+  const payment = await Payment.findOne({ applicationId }).sort({
+    createdAt: -1,
+  });
+  if (!payment) {
+    throw new AppError('Payment not found for this application', 404);
+  }
+
+  // Get latest PayPal order status if needed
+  let paypalStatus = null;
+  if (payment.status === 'CREATED' || payment.status === 'APPROVED') {
+    try {
+      const orderDetails = await paypalService.getOrder(payment.orderId);
+      paypalStatus = orderDetails.status;
+    } catch (error) {
+      console.warn('Failed to get PayPal order status:', error.message);
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      paymentId: payment.paymentId,
+      applicationId: payment.applicationId,
+      orderId: payment.orderId,
+      transactionId: payment.transactionId,
+      status: payment.status,
+      amount: payment.amount,
+      currency: payment.currency,
+      provider: payment.provider,
+      payerEmail: payment.payerEmail,
+      paymentMethod: payment.paymentMethod,
+      paypalStatus: paypalStatus,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+      metadata: payment.metadata,
+    },
+  });
+});
+
 // @desc    Refund payment
 // @route   POST /api/v1/payment/refund
 // @access  Private/Admin
